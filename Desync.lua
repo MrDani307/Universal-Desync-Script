@@ -14,6 +14,25 @@ local CoreGui = game:GetService("CoreGui")
 local lp = Players.LocalPlayer
 local char, root, hum, cam
 
+local function getQueue()
+    return (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport) or (exploit and exploit.queue_on_teleport)
+end
+
+local function saveAutoExec(state)
+    pcall(function() writefile("DesyncAutoExec.txt", tostring(state)) end)
+end
+
+local function loadAutoExec()
+    local success, result = pcall(function()
+        if isfile("DesyncAutoExec.txt") then
+            return readfile("DesyncAutoExec.txt") == "true"
+        end
+        return false
+    end)
+    return success and result or false
+end
+
+getgenv().AutoExecEnabled = loadAutoExec()
 getgenv().AuraActive = false
 getgenv().ReachRadius = 15
 getgenv().DesyncOn = false
@@ -23,15 +42,11 @@ getgenv().EspActive = false
 getgenv().StreamDelay = 3
 getgenv().fakePos = nil
 
-local pathData = {}
-local ghostPart = nil
-local streamBall = nil
-local reachCircle = nil
+local pathData, originalTransparency = {}, {}
+local ghostPart, streamBall, reachCircle = nil, nil, nil
 local lastRealCF = CFrame.new()
 local camAnchor = Instance.new("Part")
 camAnchor.Transparency = 1; camAnchor.CanCollide = false; camAnchor.Anchored = true; camAnchor.Parent = workspace
-
-local originalTransparency = {}
 
 local function refreshVars(newChar)
     if not newChar then return end
@@ -53,13 +68,9 @@ local function applyEsp(player)
         if not getgenv().EspActive then return end
         local pChar = player.Character
         if pChar then
-            local highlight = pChar:FindFirstChild("GlowthosHighlight") or Instance.new("Highlight")
-            highlight.Name = "GlowthosHighlight"
-            highlight.Parent = pChar
-            highlight.FillTransparency = 0.5
-            highlight.OutlineTransparency = 0
-            highlight.FillColor = player.TeamColor.Color
-            highlight.OutlineColor = Color3.new(1, 1, 1)
+            local h = pChar:FindFirstChild("GlowHighlight") or Instance.new("Highlight")
+            h.Name = "GlowHighlight"; h.Parent = pChar; h.FillTransparency = 0.5; h.OutlineTransparency = 0
+            h.FillColor = player.TeamColor.Color; h.OutlineColor = Color3.new(1, 1, 1)
         end
     end
     player.CharacterAdded:Connect(createHighlight)
@@ -70,19 +81,11 @@ local function makeDraggable(frame)
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+            dragging = true; dragStart = input.Position; startPos = frame.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
         end
     end)
-    frame.InputChanged:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            dragInput = input
-        end
-    end)
+    frame.InputChanged:Connect(function(input) if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then dragInput = input end end)
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
@@ -92,7 +95,7 @@ local function makeDraggable(frame)
 end
 
 local function createRemote(name, color, yPos)
-    local sg = Instance.new("ScreenGui", CoreGui); sg.Enabled = false; sg.Name = name.."_Gui"
+    local sg = Instance.new("ScreenGui", CoreGui); sg.Enabled = false
     local main = Instance.new("Frame", sg)
     main.Size = UDim2.new(0, 140, 0, 60); main.Position = UDim2.new(0.5, -70, yPos, 0)
     main.BackgroundColor3 = Color3.fromRGB(20, 20, 20); main.BackgroundTransparency = 0.3; main.Active = true
@@ -115,6 +118,12 @@ local Tab3 = Window:CreateTab("invisible", 4483362458)
 local Tab4 = Window:CreateTab("swordKillaura", 4483362458)
 local Tab5 = Window:CreateTab("Esp", 4483362458)
 
+Tab1:CreateToggle({
+    Name = "Auto Execute",
+    CurrentValue = getgenv().AutoExecEnabled,
+    Callback = function(v) getgenv().AutoExecEnabled = v; saveAutoExec(v) end
+})
+
 Tab1:CreateButton({Name = "Show Desync Remote", Callback = function() r1_sg.Enabled = true end})
 Tab1:CreateButton({Name = "Hide Desync Remote", Callback = function() r1_sg.Enabled = false end})
 
@@ -131,56 +140,44 @@ Tab4:CreateInput({Name = "Reach Radius", PlaceholderText = "15", Callback = func
 Tab5:CreateToggle({Name = "Highlight Players", CurrentValue = false, Callback = function(v) 
     getgenv().EspActive = v 
     if v then for _, p in pairs(Players:GetPlayers()) do applyEsp(p) end else
-        for _, p in pairs(Players:GetPlayers()) do if p.Character and p.Character:FindFirstChild("GlowthosHighlight") then p.Character.GlowthosHighlight:Destroy() end end
+        for _, p in pairs(Players:GetPlayers()) do if p.Character and p.Character:FindFirstChild("GlowHighlight") then p.Character.GlowHighlight:Destroy() end end
     end
 end})
 
 RunService.Heartbeat:Connect(function()
     if not root or not char then return end
-    local cf = root.CFrame
-    lastRealCF = cf
+    local cf = root.CFrame; lastRealCF = cf
     if getgenv().DesyncOn then
-        if not ghostPart then
-            ghostPart = Instance.new("Part", workspace); ghostPart.Size = Vector3.new(4, 6, 1); ghostPart.Color = Color3.fromRGB(0, 255, 150); ghostPart.Material = "Neon"; ghostPart.Transparency = 0.6; ghostPart.Anchored = true; ghostPart.CanCollide = false
-        end
-        ghostPart.CFrame = getgenv().fakePos or cf; root.CFrame = getgenv().fakePos or cf
-        RunService.RenderStepped:Wait(); root.CFrame = cf
+        if not ghostPart then ghostPart = Instance.new("Part", workspace); ghostPart.Size = Vector3.new(4, 6, 1); ghostPart.Color = Color3.fromRGB(0, 255, 150); ghostPart.Material = "Neon"; ghostPart.Transparency = 0.6; ghostPart.Anchored = true; ghostPart.CanCollide = false end
+        ghostPart.CFrame = getgenv().fakePos or cf; root.CFrame = getgenv().fakePos or cf; RunService.RenderStepped:Wait(); root.CFrame = cf
     else if ghostPart then ghostPart:Destroy(); ghostPart = nil end end
     if getgenv().StreamOn then
         table.insert(pathData, {cf = cf, t = tick()})
         if #pathData > 0 and tick() - pathData[1].t >= getgenv().StreamDelay then
-            local data = table.remove(pathData, 1)
-            if not streamBall then
-                streamBall = Instance.new("Part", workspace); streamBall.Shape = "Ball"; streamBall.Size = Vector3.new(1.5, 1.5, 1.5); streamBall.Color = Color3.fromRGB(0, 150, 255); streamBall.Material = "Neon"; streamBall.Anchored = true; streamBall.CanCollide = false
-            end
-            streamBall.CFrame = data.cf; root.CFrame = data.cf
-            RunService.RenderStepped:Wait(); root.CFrame = cf
+            local d = table.remove(pathData, 1)
+            if not streamBall then streamBall = Instance.new("Part", workspace); streamBall.Shape = "Ball"; streamBall.Size = Vector3.new(1.5, 1.5, 1.5); streamBall.Color = Color3.fromRGB(0, 150, 255); streamBall.Material = "Neon"; streamBall.Anchored = true; streamBall.CanCollide = false end
+            streamBall.CFrame = d.cf; root.CFrame = d.cf; RunService.RenderStepped:Wait(); root.CFrame = cf
         end
     else if streamBall then streamBall:Destroy(); streamBall = nil end end
     if getgenv().InvisOn then
-        root.CFrame = cf * CFrame.new(0, -100000, 0)
-        RunService.RenderStepped:Wait(); root.CFrame = cf
+        root.CFrame = cf * CFrame.new(0, -100000, 0); RunService.RenderStepped:Wait(); root.CFrame = cf
         for _, v in pairs(char:GetDescendants()) do if (v:IsA("BasePart") or v:IsA("Decal")) and v.Name ~= "HumanoidRootPart" then v.Transparency = 0.3 end end
-    else
-        for part, trans in pairs(originalTransparency) do if part and part.Parent then part.Transparency = trans end end
-    end
+    else for part, trans in pairs(originalTransparency) do if part and part.Parent then part.Transparency = trans end end end
 end)
 
 RunService.RenderStepped:Connect(function()
     if not root or not getgenv().AuraActive then if reachCircle then reachCircle:Destroy(); reachCircle = nil end return end
-    if not reachCircle then
-        reachCircle = Instance.new("Part", workspace); reachCircle.Shape = "Ball"; reachCircle.Material = "ForceField"; reachCircle.Color = Color3.fromRGB(255, 50, 50); reachCircle.Transparency = 0.7; reachCircle.CastShadow = false; reachCircle.CanCollide = false; reachCircle.Anchored = true
-    end
+    if not reachCircle then reachCircle = Instance.new("Part", workspace); reachCircle.Shape = "Ball"; reachCircle.Material = "ForceField"; reachCircle.Color = Color3.fromRGB(255, 50, 50); reachCircle.Transparency = 0.7; reachCircle.CanCollide = false; reachCircle.Anchored = true end
     reachCircle.Size = Vector3.new(getgenv().ReachRadius*2, getgenv().ReachRadius*2, getgenv().ReachRadius*2); reachCircle.CFrame = root.CFrame
     local tool = char:FindFirstChildOfClass("Tool")
     if tool and (tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")) then
-        local handle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
+        local h = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= lp and p.Character then
-                local tRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                if tRoot and (root.Position - tRoot.Position).Magnitude <= getgenv().ReachRadius then
+                local t = p.Character:FindFirstChild("HumanoidRootPart")
+                if t and (root.Position - t.Position).Magnitude <= getgenv().ReachRadius then
                     tool:Activate()
-                    for _, part in pairs(p.Character:GetChildren()) do if part:IsA("BasePart") then firetouchinterest(handle, part, 0); firetouchinterest(handle, part, 1) end end
+                    for _, pt in pairs(p.Character:GetChildren()) do if pt:IsA("BasePart") then firetouchinterest(h, pt, 0); firetouchinterest(h, pt, 1) end end
                 end
             end
         end
@@ -189,9 +186,14 @@ end)
 
 RunService:BindToRenderStep("CamFix", 201, function()
     if not cam or not hum then return end
-    if getgenv().DesyncOn or getgenv().StreamOn or getgenv().InvisOn then
-        camAnchor.CFrame = lastRealCF * CFrame.new(0, 1.5, 0); cam.CameraSubject = camAnchor
-    else cam.CameraSubject = hum end
+    if getgenv().DesyncOn or getgenv().StreamOn or getgenv().InvisOn then camAnchor.CFrame = lastRealCF * CFrame.new(0, 1.5, 0); cam.CameraSubject = camAnchor else cam.CameraSubject = hum end
+end)
+
+lp.OnTeleport:Connect(function(State)
+    local qot = getQueue()
+    if getgenv().AutoExecEnabled and qot and (State == Enum.TeleportState.Started or State == Enum.TeleportState.InProgress) then
+        qot("loadstring(game:HttpGet('https://raw.githubusercontent.com/MrDani307/Universal-Desync-Script/main/Desync.lua'))()")
+    end
 end)
 
 Players.PlayerAdded:Connect(applyEsp)
