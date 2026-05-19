@@ -1,10 +1,14 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local WindUI = loadstring(game:HttpGet('https://raw.githubusercontent.com/MrDani307/WindUi/refs/heads/main/WindUi.lua'))()
 
-local Window = Rayfield:CreateWindow({
-   Name = "Desync",
-   LoadingTitle = "Open Source",
-   LoadingSubtitle = "by Daniil",
-   ConfigurationSaving = { Enabled = false }
+local Window = WindUI:CreateWindow({
+    Title = "Desync",
+    Icon = "code", -- Icon for the window
+    Author = "by Daniil",
+    Theme = "Dark",
+    Size = UDim2.fromOffset(550, 400),
+    Transparent = false,
+    HasOutline = true,
+    Folder = "DesyncConfig"
 })
 
 local Players = game:GetService("Players")
@@ -112,37 +116,101 @@ local r1_sg, r1_btn = createRemote("DESYNC", Color3.fromRGB(0, 255, 150), 0.1)
 local r2_sg, r2_btn = createRemote("DELDESYNC", Color3.fromRGB(0, 150, 255), 0.2)
 local r3_sg, r3_btn = createRemote("INVIS", Color3.fromRGB(255, 50, 50), 0.3)
 
-local Tab1 = Window:CreateTab("Main", 4483362458)
-local Tab2 = Window:CreateTab("DelDesync", 4483362458)
-local Tab3 = Window:CreateTab("invisible", 4483362458)
-local Tab4 = Window:CreateTab("swordKillaura", 4483362458)
-local Tab5 = Window:CreateTab("Esp", 4483362458)
+-- Creating tabs using the :Tab() method in WindUI
+local Tab1 = Window:Tab({ Title = "Main", Icon = "home" })
+local Tab2 = Window:Tab({ Title = "DelDesync", Icon = "zap" })
+local Tab3 = Window:Tab({ Title = "Invisible", Icon = "eye-off" })
+local Tab4 = Window:Tab({ Title = "Sword Killaura", Icon = "swords" })
+local Tab5 = Window:Tab({ Title = "ESP", Icon = "user" })
 
-Tab1:CreateToggle({
-    Name = "Auto Execute",
-    CurrentValue = getgenv().AutoExecEnabled,
+-- Tab 1 elements: Main
+Tab1:Toggle({
+    Title = "Auto Execute",
+    Desc = "Automatically executes on teleport",
+    Value = getgenv().AutoExecEnabled,
     Callback = function(v) getgenv().AutoExecEnabled = v; saveAutoExec(v) end
 })
 
-Tab1:CreateButton({Name = "Show Desync Remote", Callback = function() r1_sg.Enabled = true end})
-Tab1:CreateButton({Name = "Hide Desync Remote", Callback = function() r1_sg.Enabled = false end})
+Tab1:Button({
+    Title = "Show Desync Remote",
+    Desc = "Show the external Desync button",
+    Callback = function() r1_sg.Enabled = true end
+})
 
-Tab2:CreateButton({Name = "Show DelDesync Remote", Callback = function() r2_sg.Enabled = true end})
-Tab2:CreateButton({Name = "Hide DelDesync Remote", Callback = function() r2_sg.Enabled = false end})
-Tab2:CreateInput({Name = "Delay Amount", PlaceholderText = "3", Callback = function(t) getgenv().StreamDelay = tonumber(t) or 3 end})
+Tab1:Button({
+    Title = "Hide Desync Remote",
+    Desc = "Hide the external Desync button",
+    Callback = function() r1_sg.Enabled = false end
+})
 
-Tab3:CreateButton({Name = "Show invisible Remote", Callback = function() r3_sg.Enabled = true end})
-Tab3:CreateButton({Name = "Hide invisible Remote", Callback = function() r3_sg.Enabled = false end})
+-- Tab 2 elements: DelDesync
+Tab2:Button({
+    Title = "Show DelDesync Remote",
+    Desc = "Show the external DelDesync button",
+    Callback = function() r2_sg.Enabled = true end
+})
 
-Tab4:CreateToggle({Name = "Activate Killaura", CurrentValue = false, Callback = function(v) getgenv().AuraActive = v end})
-Tab4:CreateInput({Name = "Reach Radius", PlaceholderText = "15", Callback = function(t) getgenv().ReachRadius = tonumber(t) or 15 end})
+Tab2:Button({
+    Title = "Hide DelDesync Remote",
+    Desc = "Hide the external DelDesync button",
+    Callback = function() r2_sg.Enabled = false end
+})
 
-Tab5:CreateToggle({Name = "Highlight Players", CurrentValue = false, Callback = function(v) 
-    getgenv().EspActive = v 
-    if v then for _, p in pairs(Players:GetPlayers()) do applyEsp(p) end else
-        for _, p in pairs(Players:GetPlayers()) do if p.Character and p.Character:FindFirstChild("GlowHighlight") then p.Character.GlowHighlight:Destroy() end end
+Tab2:Input({
+    Title = "Delay Amount",
+    Desc = "Set delay amount (Default: 3)",
+    Value = tostring(getgenv().StreamDelay),
+    Placeholder = "3",
+    Callback = function(t) getgenv().StreamDelay = tonumber(t) or 3 end
+})
+
+-- Tab 3 elements: Invisible
+Tab3:Button({
+    Title = "Show Invisible Remote",
+    Desc = "Show the external Invisible button",
+    Callback = function() r3_sg.Enabled = true end
+})
+
+Tab3:Button({
+    Title = "Hide Invisible Remote",
+    Desc = "Hide the external Invisible button",
+    Callback = function() r3_sg.Enabled = false end
+})
+
+-- Tab 4 elements: Sword Killaura
+Tab4:Toggle({
+    Title = "Activate Killaura",
+    Desc = "Enable automatic sword attacks",
+    Value = false,
+    Callback = function(v) getgenv().AuraActive = v end
+})
+
+Tab4:Input({
+    Title = "Reach Radius",
+    Desc = "Aura effective range (Default: 15)",
+    Value = tostring(getgenv().ReachRadius),
+    Placeholder = "15",
+    Callback = function(t) getgenv().ReachRadius = tonumber(t) or 15 end
+})
+
+-- Tab 5 elements: ESP
+Tab5:Toggle({
+    Title = "Highlight Players",
+    Desc = "Enable player highlights (Wallhack)",
+    Value = false,
+    Callback = function(v) 
+        getgenv().EspActive = v 
+        if v then 
+            for _, p in pairs(Players:GetPlayers()) do applyEsp(p) end 
+        else
+            for _, p in pairs(Players:GetPlayers()) do 
+                if p.Character and p.Character:FindFirstChild("GlowHighlight") then 
+                    p.Character.GlowHighlight:Destroy() 
+                end 
+            end
+        end
     end
-end})
+})
 
 RunService.Heartbeat:Connect(function()
     if not root or not char then return end
@@ -201,4 +269,9 @@ r1_btn.MouseButton1Click:Connect(function() getgenv().DesyncOn = not getgenv().D
 r2_btn.MouseButton1Click:Connect(function() getgenv().StreamOn = not getgenv().StreamOn; r2_btn.Text = "DELDESYNC: "..(getgenv().StreamOn and "ON" or "OFF") end)
 r3_btn.MouseButton1Click:Connect(function() getgenv().InvisOn = not getgenv().InvisOn; r3_btn.Text = "INVIS: "..(getgenv().InvisOn and "ON" or "OFF") end)
 
-Rayfield:Notify({Title = "Desync", Content = "Created by Daniil.", Duration = 5})
+-- Notification via WindUI in English
+WindUI:Notify({
+    Title = "Desync",
+    Content = "Created by Daniil.",
+    Duration = 5
+})
