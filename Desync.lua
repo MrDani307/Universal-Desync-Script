@@ -2,7 +2,7 @@ local WindUI = loadstring(game:HttpGet('https://raw.githubusercontent.com/MrDani
 
 local Window = WindUI:CreateWindow({
     Title = "Desync",
-    Icon = "code", -- Icon for the window
+    Icon = "code",
     Author = "by Daniil",
     Theme = "Dark",
     Size = UDim2.fromOffset(550, 400),
@@ -42,9 +42,11 @@ getgenv().ReachRadius = 15
 getgenv().DesyncOn = false
 getgenv().StreamOn = false
 getgenv().InvisOn = false
+getgenv().UndergroundOn = false
 getgenv().EspActive = false
 getgenv().StreamDelay = 3
 getgenv().fakePos = nil
+getgenv().UndergroundDepth = 10
 
 local pathData, originalTransparency = {}, {}
 local ghostPart, streamBall, reachCircle = nil, nil, nil
@@ -115,15 +117,14 @@ end
 local r1_sg, r1_btn = createRemote("DESYNC", Color3.fromRGB(0, 255, 150), 0.1)
 local r2_sg, r2_btn = createRemote("DELDESYNC", Color3.fromRGB(0, 150, 255), 0.2)
 local r3_sg, r3_btn = createRemote("INVIS", Color3.fromRGB(255, 50, 50), 0.3)
+local r4_sg, r4_btn = createRemote("UNDERGROUND", Color3.fromRGB(255, 150, 0), 0.4)
 
--- Creating tabs using the :Tab() method in WindUI
 local Tab1 = Window:Tab({ Title = "Main", Icon = "home" })
 local Tab2 = Window:Tab({ Title = "DelDesync", Icon = "zap" })
 local Tab3 = Window:Tab({ Title = "Invisible", Icon = "eye-off" })
 local Tab4 = Window:Tab({ Title = "Sword Killaura", Icon = "swords" })
 local Tab5 = Window:Tab({ Title = "ESP", Icon = "user" })
 
--- Tab 1 elements: Main
 Tab1:Toggle({
     Title = "Auto Execute",
     Desc = "Automatically executes on teleport",
@@ -143,7 +144,6 @@ Tab1:Button({
     Callback = function() r1_sg.Enabled = false end
 })
 
--- Tab 2 elements: DelDesync
 Tab2:Button({
     Title = "Show DelDesync Remote",
     Desc = "Show the external DelDesync button",
@@ -164,7 +164,6 @@ Tab2:Input({
     Callback = function(t) getgenv().StreamDelay = tonumber(t) or 3 end
 })
 
--- Tab 3 elements: Invisible
 Tab3:Button({
     Title = "Show Invisible Remote",
     Desc = "Show the external Invisible button",
@@ -177,7 +176,26 @@ Tab3:Button({
     Callback = function() r3_sg.Enabled = false end
 })
 
--- Tab 4 elements: Sword Killaura
+Tab3:Button({
+    Title = "Show Underground Remote",
+    Desc = "Show the external Underground Desync button",
+    Callback = function() r4_sg.Enabled = true end
+})
+
+Tab3:Button({
+    Title = "Hide Underground Remote",
+    Desc = "Hide the external Underground Desync button",
+    Callback = function() r4_sg.Enabled = false end
+})
+
+Tab3:Input({
+    Title = "Underground Depth",
+    Desc = "Глубина ухода под землю в студсах (Default: 10)",
+    Value = tostring(getgenv().UndergroundDepth),
+    Placeholder = "10",
+    Callback = function(t) getgenv().UndergroundDepth = tonumber(t) or 10 end
+})
+
 Tab4:Toggle({
     Title = "Activate Killaura",
     Desc = "Enable automatic sword attacks",
@@ -193,7 +211,6 @@ Tab4:Input({
     Callback = function(t) getgenv().ReachRadius = tonumber(t) or 15 end
 })
 
--- Tab 5 elements: ESP
 Tab5:Toggle({
     Title = "Highlight Players",
     Desc = "Enable player highlights (Wallhack)",
@@ -231,6 +248,9 @@ RunService.Heartbeat:Connect(function()
         root.CFrame = cf * CFrame.new(0, -100000, 0); RunService.RenderStepped:Wait(); root.CFrame = cf
         for _, v in pairs(char:GetDescendants()) do if (v:IsA("BasePart") or v:IsA("Decal")) and v.Name ~= "HumanoidRootPart" then v.Transparency = 0.3 end end
     else for part, trans in pairs(originalTransparency) do if part and part.Parent then part.Transparency = trans end end end
+    if getgenv().UndergroundOn then
+        root.CFrame = cf * CFrame.new(0, -(getgenv().UndergroundDepth or 10), 0); RunService.RenderStepped:Wait(); root.CFrame = cf
+    end
 end)
 
 RunService.RenderStepped:Connect(function()
@@ -254,7 +274,7 @@ end)
 
 RunService:BindToRenderStep("CamFix", 201, function()
     if not cam or not hum then return end
-    if getgenv().DesyncOn or getgenv().StreamOn or getgenv().InvisOn then camAnchor.CFrame = lastRealCF * CFrame.new(0, 1.5, 0); cam.CameraSubject = camAnchor else cam.CameraSubject = hum end
+    if getgenv().DesyncOn or getgenv().StreamOn or getgenv().InvisOn or getgenv().UndergroundOn then camAnchor.CFrame = lastRealCF * CFrame.new(0, 1.5, 0); cam.CameraSubject = camAnchor else cam.CameraSubject = hum end
 end)
 
 lp.OnTeleport:Connect(function(State)
@@ -268,8 +288,8 @@ Players.PlayerAdded:Connect(applyEsp)
 r1_btn.MouseButton1Click:Connect(function() getgenv().DesyncOn = not getgenv().DesyncOn; r1_btn.Text = "DESYNC: "..(getgenv().DesyncOn and "ON" or "OFF"); if getgenv().DesyncOn then getgenv().fakePos = root.CFrame end end)
 r2_btn.MouseButton1Click:Connect(function() getgenv().StreamOn = not getgenv().StreamOn; r2_btn.Text = "DELDESYNC: "..(getgenv().StreamOn and "ON" or "OFF") end)
 r3_btn.MouseButton1Click:Connect(function() getgenv().InvisOn = not getgenv().InvisOn; r3_btn.Text = "INVIS: "..(getgenv().InvisOn and "ON" or "OFF") end)
+r4_btn.MouseButton1Click:Connect(function() getgenv().UndergroundOn = not getgenv().UndergroundOn; r4_btn.Text = "UNDERGROUND: "..(getgenv().UndergroundOn and "ON" or "OFF") end)
 
--- Notification via WindUI in English
 WindUI:Notify({
     Title = "Desync",
     Content = "Created by Daniil.",
