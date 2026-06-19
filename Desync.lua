@@ -1,4 +1,4 @@
-local WindUI = loadstring(game:HttpGet('https://raw.githubusercontent.com/MrDani307/WindUi/refs/heads/main/WindUi.lua'))()
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/MrDani307/WindUi/refs/heads/main/main%20(1).lua"))()
 
 local Window = WindUI:CreateWindow({
     Title = "Desync",
