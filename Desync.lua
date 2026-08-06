@@ -16,7 +16,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local lp = Players.LocalPlayer
-local char, root, hum, cam
+local char, root, hum, head, cam
 
 local function getQueue()
     return (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport) or (exploit and exploit.queue_on_teleport)
@@ -51,14 +51,13 @@ getgenv().UndergroundDepth = 10
 local pathData, originalTransparency = {}, {}
 local ghostPart, streamBall, reachCircle = nil, nil, nil
 local lastRealCF = CFrame.new()
-local camAnchor = Instance.new("Part")
-camAnchor.Transparency = 1; camAnchor.CanCollide = false; camAnchor.Anchored = true; camAnchor.Parent = workspace
 
 local function refreshVars(newChar)
     if not newChar then return end
     char = newChar
     root = char:WaitForChild("HumanoidRootPart")
     hum = char:WaitForChild("Humanoid")
+    head = char:WaitForChild("Head")
     cam = workspace.CurrentCamera
     originalTransparency = {}
     for _, v in pairs(char:GetDescendants()) do
@@ -119,11 +118,8 @@ local r2_sg, r2_btn = createRemote("DELDESYNC", Color3.fromRGB(0, 150, 255), 0.2
 local r3_sg, r3_btn = createRemote("INVIS", Color3.fromRGB(255, 50, 50), 0.3)
 local r4_sg, r4_btn = createRemote("UNDERGROUND", Color3.fromRGB(255, 150, 0), 0.4)
 
-local Tab1 = Window:Tab({ Title = "Main", Icon = "home" })
-local Tab2 = Window:Tab({ Title = "DelDesync", Icon = "zap" })
-local Tab3 = Window:Tab({ Title = "Invisible", Icon = "eye-off" })
-local Tab4 = Window:Tab({ Title = "Sword Killaura", Icon = "swords" })
-local Tab5 = Window:Tab({ Title = "ESP", Icon = "user" })
+local Tab1 = Window:Tab({ Title = "Desync & Modes", Icon = "zap" })
+local Tab2 = Window:Tab({ Title = "Combat & Visuals", Icon = "swords" })
 
 Tab1:Toggle({
     Title = "Auto Execute",
@@ -132,78 +128,58 @@ Tab1:Toggle({
     Callback = function(v) getgenv().AutoExecEnabled = v; saveAutoExec(v) end
 })
 
-Tab1:Button({
+Tab1:Toggle({
     Title = "Show Desync Remote",
-    Desc = "Show the external Desync button",
-    Callback = function() r1_sg.Enabled = true end
+    Desc = "Show external Desync button",
+    Value = false,
+    Callback = function(v) r1_sg.Enabled = v end
 })
 
-Tab1:Button({
-    Title = "Hide Desync Remote",
-    Desc = "Hide the external Desync button",
-    Callback = function() r1_sg.Enabled = false end
-})
-
-Tab2:Button({
+Tab1:Toggle({
     Title = "Show DelDesync Remote",
-    Desc = "Show the external DelDesync button",
-    Callback = function() r2_sg.Enabled = true end
+    Desc = "Show external DelDesync button",
+    Value = false,
+    Callback = function(v) r2_sg.Enabled = v end
 })
 
-Tab2:Button({
-    Title = "Hide DelDesync Remote",
-    Desc = "Hide the external DelDesync button",
-    Callback = function() r2_sg.Enabled = false end
+Tab1:Toggle({
+    Title = "Show Invisible Remote",
+    Desc = "Show external Invisible button",
+    Value = false,
+    Callback = function(v) r3_sg.Enabled = v end
 })
 
-Tab2:Input({
-    Title = "Delay Amount",
-    Desc = "Set delay amount (Default: 3)",
+Tab1:Toggle({
+    Title = "Show Underground Remote",
+    Desc = "Show external Underground button",
+    Value = false,
+    Callback = function(v) r4_sg.Enabled = v end
+})
+
+Tab1:Input({
+    Title = "DelDesync Delay",
+    Desc = "Set stream delay amount (Default: 3)",
     Value = tostring(getgenv().StreamDelay),
     Placeholder = "3",
     Callback = function(t) getgenv().StreamDelay = tonumber(t) or 3 end
 })
 
-Tab3:Button({
-    Title = "Show Invisible Remote",
-    Desc = "Show the external Invisible button",
-    Callback = function() r3_sg.Enabled = true end
-})
-
-Tab3:Button({
-    Title = "Hide Invisible Remote",
-    Desc = "Hide the external Invisible button",
-    Callback = function() r3_sg.Enabled = false end
-})
-
-Tab3:Button({
-    Title = "Show Underground Remote",
-    Desc = "Show the external Underground Desync button",
-    Callback = function() r4_sg.Enabled = true end
-})
-
-Tab3:Button({
-    Title = "Hide Underground Remote",
-    Desc = "Hide the external Underground Desync button",
-    Callback = function() r4_sg.Enabled = false end
-})
-
-Tab3:Input({
+Tab1:Input({
     Title = "Underground Depth",
-    Desc = "Глубина ухода под землю в студсах (Default: 10)",
+    Desc = "Depth in studs (Default: 10)",
     Value = tostring(getgenv().UndergroundDepth),
     Placeholder = "10",
     Callback = function(t) getgenv().UndergroundDepth = tonumber(t) or 10 end
 })
 
-Tab4:Toggle({
+Tab2:Toggle({
     Title = "Activate Killaura",
     Desc = "Enable automatic sword attacks",
     Value = false,
     Callback = function(v) getgenv().AuraActive = v end
 })
 
-Tab4:Input({
+Tab2:Input({
     Title = "Reach Radius",
     Desc = "Aura effective range (Default: 15)",
     Value = tostring(getgenv().ReachRadius),
@@ -211,9 +187,9 @@ Tab4:Input({
     Callback = function(t) getgenv().ReachRadius = tonumber(t) or 15 end
 })
 
-Tab5:Toggle({
+Tab2:Toggle({
     Title = "Highlight Players",
-    Desc = "Enable player highlights (Wallhack)",
+    Desc = "Enable player highlights (ESP)",
     Value = false,
     Callback = function(v) 
         getgenv().EspActive = v 
@@ -232,24 +208,36 @@ Tab5:Toggle({
 RunService.Heartbeat:Connect(function()
     if not root or not char then return end
     local cf = root.CFrame; lastRealCF = cf
+
     if getgenv().DesyncOn then
+        local targetPos = getgenv().fakePos or cf
         if not ghostPart then ghostPart = Instance.new("Part", workspace); ghostPart.Size = Vector3.new(4, 6, 1); ghostPart.Color = Color3.fromRGB(0, 255, 150); ghostPart.Material = "Neon"; ghostPart.Transparency = 0.6; ghostPart.Anchored = true; ghostPart.CanCollide = false end
-        ghostPart.CFrame = getgenv().fakePos or cf; root.CFrame = getgenv().fakePos or cf; RunService.RenderStepped:Wait(); root.CFrame = cf
+        ghostPart.CFrame = targetPos
+        root.CFrame = targetPos; RunService.RenderStepped:Wait(); root.CFrame = cf
     else if ghostPart then ghostPart:Destroy(); ghostPart = nil end end
+
     if getgenv().StreamOn then
         table.insert(pathData, {cf = cf, t = tick()})
         if #pathData > 0 and tick() - pathData[1].t >= getgenv().StreamDelay then
             local d = table.remove(pathData, 1)
+            getgenv().fakePos = d.cf
             if not streamBall then streamBall = Instance.new("Part", workspace); streamBall.Shape = "Ball"; streamBall.Size = Vector3.new(1.5, 1.5, 1.5); streamBall.Color = Color3.fromRGB(0, 150, 255); streamBall.Material = "Neon"; streamBall.Anchored = true; streamBall.CanCollide = false end
-            streamBall.CFrame = d.cf; root.CFrame = d.cf; RunService.RenderStepped:Wait(); root.CFrame = cf
+            streamBall.CFrame = d.cf
+            root.CFrame = d.cf; RunService.RenderStepped:Wait(); root.CFrame = cf
         end
     else if streamBall then streamBall:Destroy(); streamBall = nil end end
+
     if getgenv().InvisOn then
-        root.CFrame = cf * CFrame.new(0, -100000, 0); RunService.RenderStepped:Wait(); root.CFrame = cf
+        local invisCF = cf * CFrame.new(0, -100000, 0)
+        getgenv().fakePos = invisCF
+        root.CFrame = invisCF; RunService.RenderStepped:Wait(); root.CFrame = cf
         for _, v in pairs(char:GetDescendants()) do if (v:IsA("BasePart") or v:IsA("Decal")) and v.Name ~= "HumanoidRootPart" then v.Transparency = 0.3 end end
     else for part, trans in pairs(originalTransparency) do if part and part.Parent then part.Transparency = trans end end end
+
     if getgenv().UndergroundOn then
-        root.CFrame = cf * CFrame.new(0, -(getgenv().UndergroundDepth or 10), 0); RunService.RenderStepped:Wait(); root.CFrame = cf
+        local undergroundCF = cf * CFrame.new(0, -(getgenv().UndergroundDepth or 10), 0)
+        getgenv().fakePos = undergroundCF
+        root.CFrame = undergroundCF; RunService.RenderStepped:Wait(); root.CFrame = cf
     end
 end)
 
@@ -272,10 +260,61 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-RunService:BindToRenderStep("CamFix", 201, function()
-    if not cam or not hum then return end
-    if getgenv().DesyncOn or getgenv().StreamOn or getgenv().InvisOn or getgenv().UndergroundOn then camAnchor.CFrame = lastRealCF * CFrame.new(0, 1.5, 0); cam.CameraSubject = camAnchor else cam.CameraSubject = hum end
+RunService:BindToRenderStep("CamFix", Enum.RenderPriority.Camera.Value + 1, function()
+    local isAnyDesyncActive = getgenv().DesyncOn or getgenv().StreamOn or getgenv().InvisOn or getgenv().UndergroundOn
+
+    if isAnyDesyncActive and getgenv().fakePos and cam and root then
+        cam.CameraSubject = nil
+        local targetOffset = lastRealCF.Position - getgenv().fakePos.Position
+        if targetOffset.Magnitude > 0.001 then
+            cam.CFrame = cam.CFrame + targetOffset
+        end
+    end
+
+    if getgenv().UndergroundOn then
+        pcall(function()
+            local playerModule = require(lp.PlayerScripts:WaitForChild("PlayerModule"))
+            local cameraModule = playerModule:GetCameras()
+            if cameraModule and cameraModule.activeCameraController then
+                if cameraModule.activeCameraController.popper then
+                    cameraModule.activeCameraController.popper.canPopper = false
+                end
+            end
+        end)
+    end
 end)
+
+local function resetDesyncState()
+    getgenv().fakePos = nil
+    if root then root.CFrame = lastRealCF end
+    pcall(function()
+        local playerModule = require(lp.PlayerScripts:WaitForChild("PlayerModule"))
+        local cameraModule = playerModule:GetCameras()
+        if cameraModule and cameraModule.activeCameraController then
+            if cameraModule.activeCameraController.popper then
+                cameraModule.activeCameraController.popper.canPopper = true
+            end
+        end
+    end)
+    if hum and cam then
+        local savedCamType = cam.CameraType
+        local currentCamCF = cam.CFrame
+        
+        cam.CameraType = Enum.CameraType.Scriptable
+        cam.CFrame = currentCamCF
+        
+        if root then
+            root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        end
+        
+        task.defer(function()
+            cam.CameraSubject = hum
+            cam.CameraType = savedCamType
+            cam.CFrame = currentCamCF
+        end)
+    end
+end
 
 lp.OnTeleport:Connect(function(State)
     local qot = getQueue()
@@ -285,10 +324,41 @@ lp.OnTeleport:Connect(function(State)
 end)
 
 Players.PlayerAdded:Connect(applyEsp)
-r1_btn.MouseButton1Click:Connect(function() getgenv().DesyncOn = not getgenv().DesyncOn; r1_btn.Text = "DESYNC: "..(getgenv().DesyncOn and "ON" or "OFF"); if getgenv().DesyncOn then getgenv().fakePos = root.CFrame end end)
-r2_btn.MouseButton1Click:Connect(function() getgenv().StreamOn = not getgenv().StreamOn; r2_btn.Text = "DELDESYNC: "..(getgenv().StreamOn and "ON" or "OFF") end)
-r3_btn.MouseButton1Click:Connect(function() getgenv().InvisOn = not getgenv().InvisOn; r3_btn.Text = "INVIS: "..(getgenv().InvisOn and "ON" or "OFF") end)
-r4_btn.MouseButton1Click:Connect(function() getgenv().UndergroundOn = not getgenv().UndergroundOn; r4_btn.Text = "UNDERGROUND: "..(getgenv().UndergroundOn and "ON" or "OFF") end)
+
+r1_btn.MouseButton1Click:Connect(function() 
+    getgenv().DesyncOn = not getgenv().DesyncOn
+    r1_btn.Text = "DESYNC: "..(getgenv().DesyncOn and "ON" or "OFF")
+    if getgenv().DesyncOn then 
+        getgenv().fakePos = root.CFrame 
+    else
+        resetDesyncState()
+    end 
+end)
+
+r2_btn.MouseButton1Click:Connect(function() 
+    getgenv().StreamOn = not getgenv().StreamOn
+    r2_btn.Text = "DELDESYNC: "..(getgenv().StreamOn and "ON" or "OFF")
+    if not getgenv().StreamOn then
+        pathData = {}
+        resetDesyncState()
+    end
+end)
+
+r3_btn.MouseButton1Click:Connect(function() 
+    getgenv().InvisOn = not getgenv().InvisOn
+    r3_btn.Text = "INVIS: "..(getgenv().InvisOn and "ON" or "OFF")
+    if not getgenv().InvisOn then
+        resetDesyncState()
+    end
+end)
+
+r4_btn.MouseButton1Click:Connect(function() 
+    getgenv().UndergroundOn = not getgenv().UndergroundOn
+    r4_btn.Text = "UNDERGROUND: "..(getgenv().UndergroundOn and "ON" or "OFF")
+    if not getgenv().UndergroundOn then
+        resetDesyncState()
+    end
+end)
 
 WindUI:Notify({
     Title = "Desync",
