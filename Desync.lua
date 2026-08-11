@@ -48,7 +48,7 @@ getgenv().StreamDelay = 3
 getgenv().fakePos = nil
 getgenv().UndergroundDepth = 10
 
-local pathData, originalTransparency = {}, {}
+local pathData = {}
 local ghostPart, streamBall, reachCircle = nil, nil, nil
 local lastRealCF = CFrame.new()
 
@@ -59,10 +59,6 @@ local function refreshVars(newChar)
     hum = char:WaitForChild("Humanoid")
     head = char:WaitForChild("Head")
     cam = workspace.CurrentCamera
-    originalTransparency = {}
-    for _, v in pairs(char:GetDescendants()) do
-        if v:IsA("BasePart") or v:IsA("Decal") then originalTransparency[v] = v.Transparency end
-    end
 end
 if lp.Character then refreshVars(lp.Character) end
 lp.CharacterAdded:Connect(refreshVars)
@@ -228,11 +224,11 @@ RunService.Heartbeat:Connect(function()
     else if streamBall then streamBall:Destroy(); streamBall = nil end end
 
     if getgenv().InvisOn then
-        local invisCF = cf * CFrame.new(0, -100000, 0)
-        getgenv().fakePos = invisCF
-        root.CFrame = invisCF; RunService.RenderStepped:Wait(); root.CFrame = cf
-        for _, v in pairs(char:GetDescendants()) do if (v:IsA("BasePart") or v:IsA("Decal")) and v.Name ~= "HumanoidRootPart" then v.Transparency = 0.3 end end
-    else for part, trans in pairs(originalTransparency) do if part and part.Parent then part.Transparency = trans end end end
+        local targetPos = getgenv().fakePos or cf
+        if not ghostPart then ghostPart = Instance.new("Part", workspace); ghostPart.Size = Vector3.new(4, 6, 1); ghostPart.Color = Color3.fromRGB(255, 50, 50); ghostPart.Material = "Neon"; ghostPart.Transparency = 0.6; ghostPart.Anchored = true; ghostPart.CanCollide = false end
+        ghostPart.CFrame = targetPos
+        root.CFrame = targetPos; RunService.RenderStepped:Wait(); root.CFrame = cf
+    end
 
     if getgenv().UndergroundOn then
         local undergroundCF = cf * CFrame.new(0, -(getgenv().UndergroundDepth or 10), 0)
@@ -288,7 +284,7 @@ local function resetDesyncState()
     getgenv().fakePos = nil
     if root then root.CFrame = lastRealCF end
     pcall(function()
-        local playerModule = require(lp.PlayerScripts:WaitForChild("PlayerModule"))
+        local playerModule = require(lp.PlayerScripts:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
         local cameraModule = playerModule:GetCameras()
         if cameraModule and cameraModule.activeCameraController then
             if cameraModule.activeCameraController.popper then
@@ -347,7 +343,9 @@ end)
 r3_btn.MouseButton1Click:Connect(function() 
     getgenv().InvisOn = not getgenv().InvisOn
     r3_btn.Text = "INVIS: "..(getgenv().InvisOn and "ON" or "OFF")
-    if not getgenv().InvisOn then
+    if getgenv().InvisOn then
+        getgenv().fakePos = root.CFrame * CFrame.new(0, -500, 0)
+    else
         resetDesyncState()
     end
 end)
